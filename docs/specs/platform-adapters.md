@@ -185,8 +185,9 @@ adapter = StubAdapter(raise_exception=True,
 | `exception_message` | str | `"stub exception"` | Exception message |
 | `platform_response` | dict \| None | `None` | Raw response field |
 
-`StubAdapter` calls `validate_adapter_result` before returning, so misconfigured stubs
-are caught at test time rather than silently producing bad results.
+`StubAdapter` calls `validate_adapter_result` before returning; the registry dispatch
+path and each platform adapter's credential-failure path do the same, so all
+hand-assembled failure dicts are validated consistently.
 
 ---
 
