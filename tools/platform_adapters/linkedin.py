@@ -82,13 +82,15 @@ class LinkedInAdapter:
     def __call__(self, entry: dict) -> dict:
         missing = [k for k in REQUIRED_CREDENTIALS if not self._creds.get(k)]
         if missing:
-            return {
+            result = {
                 "success":           False,
                 "error_code":        AUTH_ERROR,
                 "message":           f"Missing credentials: {', '.join(missing)}",
                 "retryable":         False,
                 "platform_response": None,
             }
+            validate_adapter_result(result)
+            return result
         raise NotImplementedError(
             "LinkedInAdapter: real HTTP delivery is not yet implemented."
         )

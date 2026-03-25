@@ -16,7 +16,7 @@ Two public functions:
 
 import importlib
 
-from .base import UNKNOWN_ERROR
+from .base import UNKNOWN_ERROR, validate_adapter_result
 from .stub import StubAdapter
 
 # ---------------------------------------------------------------------------
@@ -95,24 +95,28 @@ def get_dispatch_adapter(credentials: dict | None = None):
         platform = str(entry.get("platform") or "")
 
         if not platform:
-            return {
+            result = {
                 "success":           False,
                 "error_code":        UNKNOWN_ERROR,
                 "message":           "Queue entry has no 'platform' field.",
                 "retryable":         False,
                 "platform_response": None,
             }
+            validate_adapter_result(result)
+            return result
 
         try:
             adapter = get_adapter(platform, credentials)
         except ValueError:
-            return {
+            result = {
                 "success":           False,
                 "error_code":        UNKNOWN_ERROR,
                 "message":           f"Unknown platform: {platform}",
                 "retryable":         False,
                 "platform_response": None,
             }
+            validate_adapter_result(result)
+            return result
 
         return adapter(entry)
 
