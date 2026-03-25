@@ -27,7 +27,7 @@ means:
 ```
 config/platforms/
 ├── platform.schema.json   # JSON Schema (draft-07) for all platform files
-├── x.json                 # Twitter / X
+├── twitter.json           # Twitter / X (aliases: "x", "twitter/x", "x/twitter")
 ├── linkedin.json
 ├── instagram.json
 ├── facebook.json
