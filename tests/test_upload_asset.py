@@ -613,15 +613,16 @@ class TestRealPolicyIntegration(unittest.TestCase):
         _clear_policy_cache()
 
     def test_real_policy_validation_pass_reaches_adapter(self):
-        """A valid logo reaches the adapter (which returns UPLOAD_NOT_IMPLEMENTED)."""
+        """A valid logo reaches the real twitter adapter (which fails on missing creds)."""
         result = upload_asset(
             {"asset_type": "logo", "format": "png", "alt_text": "OpenClaw logo"},
             "twitter",
         )
-        # Adapter not implemented → UPLOAD_NOT_IMPLEMENTED, but validation passed
+        # Validation passed; twitter adapter returns AUTH_ERROR when no credentials
+        # are provided (no credentials dict passed, so credentials defaults to {}).
         self.assertEqual(result["validation_errors"], [])
         codes = [e["code"] for e in result["errors"]]
-        self.assertIn("UPLOAD_NOT_IMPLEMENTED", codes)
+        self.assertIn("AUTH_ERROR", codes)
 
     def test_real_policy_missing_alt_text_fails_before_adapter(self):
         """Real policy require_alt_text: true triggers validation failure."""
