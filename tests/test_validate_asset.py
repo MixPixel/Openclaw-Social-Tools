@@ -43,6 +43,9 @@ Coverage:
                                   customer_photo with complete license
   TestResultShape               — errors/warnings always lists; valid is bool; asset_type
                                   and platform always in result; warnings always []
+  TestRealPolicyIntegration     — integration tests against real config/asset_policy.json
+                                  with no policy_path injection; confirms real policy and
+                                  capability registry are both exercised end-to-end
 """
 
 import json
@@ -973,6 +976,108 @@ class TestResultShape(_PolicyFileMixin, unittest.TestCase):
 
     def test_hard_stop_result_shape_is_valid(self):
         result = self._validate(_logo(), platform="tiktok")
+        validate_asset_result(result)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# TestRealPolicyIntegration
+# ---------------------------------------------------------------------------
+
+class TestRealPolicyIntegration(unittest.TestCase):
+    """Integration tests that call validate_asset() without policy_path injection.
+
+    These tests exercise the real config/asset_policy.json resolved via the
+    Path(__file__) anchor in validate_asset.py.  No source_url is provided so
+    the placeholder strings in approved_source_domains / forbidden_url_patterns
+    do not affect outcomes.
+    """
+
+    def setUp(self):
+        _clear_policy_cache()
+
+    def tearDown(self):
+        _clear_policy_cache()
+
+    def test_real_policy_loads(self):
+        """validate_asset() loads real config/asset_policy.json without error."""
+        result = validate_asset(
+            {"asset_type": "logo", "format": "png", "alt_text": "x"},
+            "twitter",
+        )
+        self.assertIsInstance(result, dict)
+
+    def test_valid_logo_twitter(self):
+        """logo + png + social_post + alt_text is fully valid on twitter."""
+        result = validate_asset(
+            {
+                "asset_type": "logo",
+                "format":     "png",
+                "alt_text":   "OpenClaw logo",
+                "context":    "social_post",
+            },
+            "twitter",
+        )
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["errors"], [])
+
+    def test_missing_alt_text_fails(self):
+        """Omitting alt_text triggers ALT_TEXT_REQUIRED (real require_alt_text: true)."""
+        result = validate_asset(
+            {"asset_type": "logo", "format": "png"},
+            "twitter",
+        )
+        self.assertFalse(result["valid"])
+        codes = [e["code"] for e in result["errors"]]
+        self.assertIn(ALT_TEXT_REQUIRED, codes)
+        self.assertEqual(len(result["errors"]), 1)
+
+    def test_customer_photo_missing_license(self):
+        """customer_photo without license → LICENSE_REQUIRED + ATTRIBUTION_REQUIRED."""
+        result = validate_asset(
+            {
+                "asset_type": "customer_photo",
+                "format":     "jpeg",
+                "alt_text":   "Jane at our event",
+                "context":    "social_post",
+            },
+            "twitter",
+        )
+        self.assertFalse(result["valid"])
+        codes = [e["code"] for e in result["errors"]]
+        self.assertIn(LICENSE_REQUIRED, codes)
+        self.assertIn(ATTRIBUTION_REQUIRED, codes)
+
+    def test_invalid_format_for_twitter(self):
+        """tiff is not in twitter's media_formats → FORMAT_NOT_ALLOWED."""
+        result = validate_asset(
+            {"asset_type": "logo", "format": "tiff", "alt_text": "OpenClaw logo"},
+            "twitter",
+        )
+        self.assertFalse(result["valid"])
+        codes = [e["code"] for e in result["errors"]]
+        self.assertIn(FORMAT_NOT_ALLOWED, codes)
+
+    def test_unknown_platform_hard_stop(self):
+        """Unregistered platform → UNKNOWN_PLATFORM; no further errors."""
+        result = validate_asset(
+            {"asset_type": "logo", "format": "png", "alt_text": "x"},
+            "notaplatform",
+        )
+        self.assertFalse(result["valid"])
+        self.assertEqual(len(result["errors"]), 1)
+        self.assertEqual(result["errors"][0]["code"], UNKNOWN_PLATFORM)
+
+    def test_result_shape_is_valid(self):
+        """validate_asset_result() accepts the real-policy result without raising."""
+        result = validate_asset(
+            {
+                "asset_type": "logo",
+                "format":     "png",
+                "alt_text":   "OpenClaw logo",
+                "context":    "social_post",
+            },
+            "twitter",
+        )
         validate_asset_result(result)  # must not raise
 
 
