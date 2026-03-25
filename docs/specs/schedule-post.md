@@ -145,6 +145,26 @@ always valid here).
 
 ---
 
+## Behavioural Alignment with find-next-slot
+
+`schedule_post` inlines its own slot validation rather than importing helpers from
+`find_next_slot`. The two tools must remain behaviourally aligned on the following rules.
+If either tool's logic is changed, the other must be updated to match.
+
+| Rule | Required behaviour |
+|---|---|
+| **Conflict threshold** | `abs(slot − existing_slot) < min_gap_minutes` (strictly less than). A slot at **exactly** `min_gap_minutes` from another is **allowed**. |
+| **Allowed window check** | Uses `schedule_config.timezone` to convert the candidate UTC slot to local time before comparing against `allowed_windows` start/end times. UTC is never assumed when a timezone is configured. |
+| **Blackout date check** | Converts the candidate UTC slot to local date (using `schedule_config.timezone`) before comparing against `blackout_dates`. |
+| **Timezone handling** | All window, blackout, and daily-cap checks operate in the **config timezone**, not in the caller's local time or UTC. |
+| **Day-of-week check** | `days` keys in `allowed_windows` entries follow Python's `weekday()` convention (0 = Monday, 6 = Sunday) via the shared `_DAY_MAP` short-name mapping. |
+
+Guard tests in `tests/test_schedule_post.py` (`TestAlignmentWithFindNextSlot`) call both
+tools with identical inputs and assert they reach the same conclusion on the most
+important shared edge cases.
+
+---
+
 ## Side Effects
 
 On success, this tool:

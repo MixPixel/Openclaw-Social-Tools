@@ -10,6 +10,7 @@ import tempfile
 import unittest
 
 from tools.approval_state_manager import manage_approval_state
+from tools.find_next_slot import find_next_slot
 from tools.schedule_post import schedule_post
 
 # ---------------------------------------------------------------------------
@@ -467,6 +468,126 @@ class TestNoSideEffectsOnFailure(_Base):
         self._schedule(content="x" * 300)
         state = self._asm({"action": "get_state", "post_id": self.POST_ID})
         self.assertEqual(state["current_state"], "approved")
+
+
+# ---------------------------------------------------------------------------
+# Alignment guard tests
+# ---------------------------------------------------------------------------
+
+class TestAlignmentWithFindNextSlot(_Base):
+    """Guard tests: schedule_post and find_next_slot must agree on shared rules.
+
+    These tests call both tools independently with identical inputs and assert
+    they reach the same conclusion. They exist to catch drift if either tool's
+    inlined logic is updated without updating the other.
+
+    Architecture is unchanged: schedule_post still inlines its slot validation.
+    """
+
+    def test_exact_min_gap_allowed_by_both(self):
+        """A slot exactly min_gap_minutes from an existing entry is allowed by both tools."""
+        existing = "2026-03-25T08:00:00+00:00"
+        candidate = "2026-03-25T09:00:00+00:00"  # exactly 60 min later; min_gap = 60
+
+        # find_next_slot: searching from just before 09:00 should land on 09:00
+        fns = find_next_slot({
+            "platform": "twitter",
+            "after": "2026-03-25T08:55:00+00:00",
+            "schedule_config": SCHED,
+            "existing_queue": [existing],
+        })
+        self.assertTrue(fns["available"], fns)
+        self.assertEqual(fns["slot"], candidate)
+
+        # schedule_post: same slot with the same existing entry in the queue → should succeed
+        with open(self.queue_path, "w") as fh:
+            json.dump({"q_pre": {
+                "queue_id": "q_pre", "post_id": "post_other", "platform": "twitter",
+                "content": "other", "slot": existing, "media": [], "actor": "other",
+                "created_at": CREATED,
+            }}, fh)
+        r = self._schedule(slot=candidate, queue_id="q_align_exact")
+        self.assertTrue(r["success"], r)
+
+    def test_sub_gap_blocked_by_schedule_skipped_by_fns(self):
+        """A slot within min_gap is rejected by schedule_post and skipped by find_next_slot."""
+        existing  = "2026-03-25T08:00:00+00:00"
+        too_close = "2026-03-25T08:30:00+00:00"  # 30 min later, below min_gap of 60
+
+        # find_next_slot skips 08:30 (conflict) and returns 09:00
+        fns = find_next_slot({
+            "platform": "twitter",
+            "after": "2026-03-25T08:25:00+00:00",
+            "schedule_config": SCHED,
+            "existing_queue": [existing],
+        })
+        self.assertTrue(fns["available"], fns)
+        self.assertNotEqual(fns["slot"], too_close)
+
+        # schedule_post rejects the same too-close slot
+        with open(self.queue_path, "w") as fh:
+            json.dump({"q_pre": {
+                "queue_id": "q_pre", "post_id": "post_other", "platform": "twitter",
+                "content": "other", "slot": existing, "media": [], "actor": "other",
+                "created_at": CREATED,
+            }}, fh)
+        r = self._schedule(slot=too_close)
+        self.assertFalse(r["success"])
+        self.assertEqual(r["error_code"], "SLOT_CONFLICT")
+
+    def test_blackout_date_blocked_by_both(self):
+        """Both tools respect blackout_dates: find_next_slot skips the day, schedule_post rejects."""
+        blackout_config = {**SCHED, "blackout_dates": ["2026-03-25"]}
+
+        # find_next_slot: should skip 2026-03-25 and return a slot on 2026-03-26
+        fns = find_next_slot({
+            "platform": "twitter",
+            "after": NOW,
+            "schedule_config": blackout_config,
+        })
+        self.assertTrue(fns["available"], fns)
+        from datetime import timezone as _tz
+        returned_date = (
+            __import__("datetime").datetime.fromisoformat(fns["slot"])
+            .astimezone(_tz.utc).date().isoformat()
+        )
+        self.assertNotEqual(returned_date, "2026-03-25")
+
+        # schedule_post: a slot falling on the blackout date should be rejected
+        r = self._schedule(schedule_config=blackout_config)
+        self.assertFalse(r["success"])
+        self.assertEqual(r["error_code"], "SLOT_ON_BLACKOUT_DATE")
+
+    def test_timezone_window_slot_accepted_by_both(self):
+        """Both tools use the config timezone for window checks, not UTC.
+
+        Config: America/New_York, window 09:00-17:00.
+        2026-03-24 is a Tuesday. Spring-forward was Mar 8, so EDT = UTC-4.
+        NOW is 2026-03-24T12:00Z = 08:00 EDT — before the 09:00 window opens.
+        First valid slot is 09:00 EDT on the same day = 13:00 UTC on 2026-03-24.
+        """
+        ny_config = {
+            "timezone": "America/New_York",
+            "allowed_windows": [
+                {"days": ["mon", "tue", "wed", "thu", "fri"], "start": "09:00", "end": "17:00"},
+            ],
+            "min_gap_minutes": 60,
+            "slot_resolution_minutes": 15,
+        }
+        expected_slot = "2026-03-24T13:00:00+00:00"  # 09:00 EDT same day as NOW
+
+        # find_next_slot returns 13:00 UTC as the first available slot
+        fns = find_next_slot({
+            "platform": "twitter",
+            "after": NOW,
+            "schedule_config": ny_config,
+        })
+        self.assertTrue(fns["available"], fns)
+        self.assertEqual(fns["slot"], expected_slot)
+
+        # schedule_post accepts that same slot (both tools agree on the window boundary)
+        r = self._schedule(slot=expected_slot, schedule_config=ny_config, queue_id="q_tz_01")
+        self.assertTrue(r["success"], r)
 
 
 if __name__ == "__main__":
