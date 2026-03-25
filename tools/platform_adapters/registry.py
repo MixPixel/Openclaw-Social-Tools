@@ -12,24 +12,20 @@ Two public functions:
     adapter based on entry["platform"]. Unknown platform values in a queue
     entry return a failure dict — they never raise, so publish_post always
     receives a clean result.
+
+Module resolution is delegated to capability_registry.get_definition(), which
+is the single authoritative source for which platforms are supported and which
+module implements each one. registry.py never maintains its own platform list.
 """
 
 import importlib
 
 from .base import UNKNOWN_ERROR, validate_adapter_result
 from .stub import StubAdapter
-
-# ---------------------------------------------------------------------------
-# Platform registry
-# ---------------------------------------------------------------------------
-
-_PLATFORM_TO_MODULE: dict[str, str] = {
-    "twitter":   "tools.platform_adapters.twitter",
-    "linkedin":  "tools.platform_adapters.linkedin",
-    "instagram": "tools.platform_adapters.instagram",
-    "facebook":  "tools.platform_adapters.facebook",
-    "mastodon":  "tools.platform_adapters.mastodon",
-}
+from .capability_registry import (
+    get_definition as _get_definition,
+    list_platforms as _list_platforms,
+)
 
 _STUB_PLATFORM = "stub"
 
@@ -60,14 +56,16 @@ def get_adapter(platform: str, credentials: dict | None = None):
     if platform == _STUB_PLATFORM:
         return StubAdapter()
 
-    if platform not in _PLATFORM_TO_MODULE:
-        supported = ", ".join(sorted(_PLATFORM_TO_MODULE.keys()))
+    try:
+        defn = _get_definition(platform)
+    except ValueError:
+        supported = ", ".join(_list_platforms())
         raise ValueError(
             f"Unknown platform '{platform}'. "
             f"Supported: {supported}, {_STUB_PLATFORM}."
         )
 
-    module = importlib.import_module(_PLATFORM_TO_MODULE[platform])
+    module = importlib.import_module(defn.module_path)
     return module.get_adapter(credentials)
 
 

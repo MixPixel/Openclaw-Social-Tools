@@ -18,6 +18,20 @@ Adapters:
     get_adapter(platform, credentials=None)         → platform adapter callable
     get_dispatch_adapter(credentials=None)          → dispatch callable (all platforms)
 
+Capability contract (from contract):
+    PUBLISH_POST, PUBLISH_THREAD, UPLOAD_ASSET, VALIDATE_POST, PREVIEW_POST
+    ALL_CAPABILITIES                  → frozenset of all known capability strings
+    AdapterDefinition                 → immutable dataclass for an adapter's contract
+    validate_definition(defn)         → None (raises ValueError on bad shape)
+
+Capability registry (from capability_registry):
+    CapabilityError                   → raised when a capability is not declared
+    get_definition(platform_id)       → AdapterDefinition (raises ValueError if unknown)
+    list_platforms()                  → sorted list of registered platform IDs
+    list_capabilities(platform_id)    → sorted list of declared capabilities
+    supports_capability(platform_id, capability) → bool
+    require_capability(platform_id, capability)  → None (raises CapabilityError)
+
 Usage
 -----
     from tools.platform_adapters import get_dispatch_adapter
@@ -25,6 +39,11 @@ Usage
 
     adapter = get_dispatch_adapter()           # reads credentials from os.environ
     result = publish_post(data, _adapter=adapter)
+
+    # Capability query before dispatching:
+    from tools.platform_adapters import supports_capability, PUBLISH_THREAD
+    if supports_capability("twitter", PUBLISH_THREAD):
+        ...
 """
 
 from .base import (
@@ -44,6 +63,24 @@ from .base import (
 )
 from .stub import StubAdapter
 from .registry import get_adapter, get_dispatch_adapter
+from .contract import (
+    PUBLISH_POST,
+    PUBLISH_THREAD,
+    UPLOAD_ASSET,
+    VALIDATE_POST,
+    PREVIEW_POST,
+    ALL_CAPABILITIES,
+    AdapterDefinition,
+    validate_definition,
+)
+from .capability_registry import (
+    CapabilityError,
+    get_definition,
+    list_platforms,
+    list_capabilities,
+    supports_capability,
+    require_capability,
+)
 
 __all__ = [
     # Error code constants
@@ -57,7 +94,7 @@ __all__ = [
     "TIMEOUT",
     "UNKNOWN_ERROR",
     "ALL_ERROR_CODES",
-    # Helpers
+    # Adapter helpers
     "is_retryable",
     "classify_http_error",
     "validate_adapter_result",
@@ -65,4 +102,21 @@ __all__ = [
     "StubAdapter",
     "get_adapter",
     "get_dispatch_adapter",
+    # Capability constants
+    "PUBLISH_POST",
+    "PUBLISH_THREAD",
+    "UPLOAD_ASSET",
+    "VALIDATE_POST",
+    "PREVIEW_POST",
+    "ALL_CAPABILITIES",
+    # Contract type and validator
+    "AdapterDefinition",
+    "validate_definition",
+    # Capability registry
+    "CapabilityError",
+    "get_definition",
+    "list_platforms",
+    "list_capabilities",
+    "supports_capability",
+    "require_capability",
 ]
