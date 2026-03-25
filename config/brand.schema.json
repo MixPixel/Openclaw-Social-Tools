@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BrandPack",
+  "description": "Schema for a single brand pack file (e.g. config/brand.json). One file per brand; multi-brand setups use config/brands/<brand_id>.json.",
+  "type": "object",
+  "required": [
+    "brand_id",
+    "brand_name",
+    "handles",
+    "voice",
+    "tone",
+    "default_hashtags",
+    "bio",
+    "logo_path",
+    "brand_colours",
+    "forbidden_terms",
+    "cta_phrases"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "brand_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical slug identifier for this brand (e.g. 'openclaw'). Used as the key when multiple brands are stored."
+    },
+    "brand_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable brand name (e.g. 'OpenClaw')."
+    },
+    "handles": {
+      "type": "object",
+      "description": "Social media handle for each platform, keyed by canonical platform_id (e.g. 'twitter', 'linkedin'). Use the platform's native handle format.",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "voice": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Single-sentence description of the brand's overall voice (e.g. 'knowledgeable and approachable')."
+    },
+    "tone": {
+      "type": "array",
+      "description": "Ordered list of tone adjectives, most important first.",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "default_hashtags": {
+      "type": "array",
+      "description": "Hashtags included by default in posts unless overridden. Include the leading '#'.",
+      "items": { "type": "string", "pattern": "^#\\S+" }
+    },
+    "bio": {
+      "type": "object",
+      "description": "Brand bio in two lengths for platforms with different bio field limits.",
+      "required": ["short", "long"],
+      "additionalProperties": false,
+      "properties": {
+        "short": {
+          "type": "string",
+          "description": "Short bio (≤160 characters) for platforms like Twitter/X."
+        },
+        "long": {
+          "type": "string",
+          "description": "Long bio for platforms that support extended descriptions (LinkedIn, Facebook)."
+        }
+      }
+    },
+    "logo_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative path from repo root to the primary logo file."
+    },
+    "brand_colours": {
+      "type": "object",
+      "description": "Brand colour palette. Values should be CSS hex strings (e.g. '#FF5733'). Any keys are allowed; 'primary', 'secondary', and 'accent' are conventional.",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
+      }
+    },
+    "forbidden_terms": {
+      "type": "array",
+      "description": "Exact terms (case-insensitive) that must never appear in published posts.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "cta_phrases": {
+      "type": "array",
+      "description": "Approved call-to-action phrases available for use in post copy.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "_notes": {
+      "type": "string",
+      "description": "Free-text notes, caveats, or TODO items for this brand file."
+    }
+  }
+}

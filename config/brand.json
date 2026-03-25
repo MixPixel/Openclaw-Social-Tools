@@ -1,0 +1,30 @@
+{
+  "brand_id": "openclaw",
+  "brand_name": "OpenClaw",
+  "handles": {
+    "twitter":   "@OpenClaw",
+    "linkedin":  "openclaw",
+    "instagram": "@openclaw",
+    "facebook":  "OpenClaw",
+    "mastodon":  "@openclaw@mastodon.social"
+  },
+  "voice": "knowledgeable and approachable — we make complex social-media workflows feel simple",
+  "tone": ["informative", "concise", "friendly", "practical"],
+  "default_hashtags": ["#OpenClaw", "#SocialTools"],
+  "bio": {
+    "short": "PLACEHOLDER — short bio ≤160 chars (Twitter/X, Instagram)",
+    "long":  "PLACEHOLDER — extended bio for LinkedIn and Facebook profiles"
+  },
+  "logo_path": "assets/logo/openclaw_logo.png",
+  "brand_colours": {
+    "primary":   "#1A1A2E",
+    "secondary": "#16213E",
+    "accent":    "#0F3460"
+  },
+  "forbidden_terms": [],
+  "cta_phrases": [
+    "PLACEHOLDER — add your primary CTA phrase here",
+    "Learn more at openclaw.io"
+  ],
+  "_notes": "PLACEHOLDER fields that need real values before launch: bio.short, bio.long, cta_phrases[0]. Handles are illustrative — confirm actual account names. brand_colours are placeholder hex values — replace with real brand palette. forbidden_terms is intentionally empty for now; populate from brand-guidelines review."
+}
