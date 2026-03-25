@@ -468,7 +468,8 @@ class TestCredentialResolution(unittest.TestCase):
 
 class TestPlatformModuleShapes(unittest.TestCase):
     """Each platform module must export REQUIRED_CREDENTIALS, _build_payload,
-    _parse_response, a PlatformAdapter class, and a get_adapter factory."""
+    _parse_response, a PlatformAdapter class, a get_adapter factory, and
+    an upload_asset function."""
 
     _PLATFORMS = ["twitter", "linkedin", "instagram", "facebook", "mastodon"]
 
@@ -542,6 +543,15 @@ class TestPlatformModuleShapes(unittest.TestCase):
                                        msg=f"{platform}._parse_response should raise NotImplementedError"):
                     mod._parse_response(200, "{}")
 
+    def test_upload_asset_is_callable(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                self.assertTrue(
+                    hasattr(mod, "upload_asset") and callable(mod.upload_asset),
+                    msg=f"{platform} module must export callable upload_asset()",
+                )
+
     def test_platform_adapter_raises_not_implemented_with_full_creds(self):
         """With valid credentials, __call__ raises NotImplementedError (skeleton)."""
         full_creds = {
@@ -569,6 +579,197 @@ class TestPlatformModuleShapes(unittest.TestCase):
                 with self.assertRaises(NotImplementedError,
                                        msg=f"{platform} adapter should raise NotImplementedError"):
                     adapter(_ENTRY)
+
+
+# ---------------------------------------------------------------------------
+# TestAdapterUploadAsset
+# ---------------------------------------------------------------------------
+
+class TestAdapterUploadAsset(unittest.TestCase):
+    """Covers upload_asset() across all five platform adapters.
+
+    All platforms follow the same stub pattern (credential check +
+    injectable _upload_api seam), so subtests run the same assertions
+    against every module.
+    """
+
+    _PLATFORMS = ["twitter", "linkedin", "instagram", "facebook", "mastodon"]
+
+    # Full credential sets per platform (values are arbitrary non-empty strings).
+    _FULL_CREDS = {
+        "twitter":   {
+            "TWITTER_API_KEY": "k", "TWITTER_API_SECRET": "s",
+            "TWITTER_ACCESS_TOKEN": "t", "TWITTER_ACCESS_SECRET": "ts",
+        },
+        "linkedin":  {"LINKEDIN_ACCESS_TOKEN": "tok"},
+        "instagram": {
+            "INSTAGRAM_ACCESS_TOKEN": "tok",
+            "INSTAGRAM_BUSINESS_ACCOUNT_ID": "bid",
+        },
+        "facebook":  {
+            "FACEBOOK_PAGE_ACCESS_TOKEN": "tok",
+            "FACEBOOK_PAGE_ID": "pid",
+        },
+        "mastodon":  {
+            "MASTODON_ACCESS_TOKEN": "tok",
+            "MASTODON_INSTANCE_URL": "mastodon.social",
+        },
+    }
+
+    _ASSET = {"asset_type": "logo", "format": "png", "alt_text": "x"}
+
+    def _import_module(self, platform: str):
+        import importlib
+        return importlib.import_module(f"tools.platform_adapters.{platform}")
+
+    # --- Credential checks --------------------------------------------------
+
+    def test_empty_credentials_returns_auth_error(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                result = mod.upload_asset(self._ASSET, {})
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error_code"], "AUTH_ERROR",
+                                 msg=f"{platform}: expected AUTH_ERROR on empty creds")
+
+    def test_missing_creds_message_names_keys(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                result = mod.upload_asset(self._ASSET, {})
+                # At least one credential key name should appear in the message.
+                import importlib as _il
+                m = _il.import_module(f"tools.platform_adapters.{platform}")
+                first_key = m.REQUIRED_CREDENTIALS[0]
+                self.assertIn(first_key, result["message"])
+
+    def test_empty_string_credentials_treated_as_missing(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                import importlib as _il
+                m = _il.import_module(f"tools.platform_adapters.{platform}")
+                empty_creds = {k: "" for k in m.REQUIRED_CREDENTIALS}
+                result = mod.upload_asset(self._ASSET, empty_creds)
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error_code"], "AUTH_ERROR")
+
+    # --- Default API (NotImplementedError → UPLOAD_NOT_IMPLEMENTED) ---------
+
+    def test_full_creds_default_api_returns_upload_not_implemented(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                creds = self._FULL_CREDS[platform]
+                result = mod.upload_asset(self._ASSET, creds)
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error_code"], "UPLOAD_NOT_IMPLEMENTED",
+                                 msg=f"{platform}: expected UPLOAD_NOT_IMPLEMENTED from default API")
+
+    def test_upload_not_implemented_message_is_non_empty(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                result = mod.upload_asset(self._ASSET, self._FULL_CREDS[platform])
+                self.assertIsInstance(result["message"], str)
+                self.assertGreater(len(result["message"]), 0)
+
+    # --- Injected _upload_api (success) -------------------------------------
+
+    def test_mock_api_success_returns_asset_ref(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                mock_api = lambda a, c: {"success": True, "asset_ref": f"{platform}_media_1"}
+                result = mod.upload_asset(
+                    self._ASSET, self._FULL_CREDS[platform], _upload_api=mock_api
+                )
+                self.assertTrue(result["success"])
+                self.assertEqual(result["asset_ref"], f"{platform}_media_1")
+
+    def test_mock_api_called_with_asset_and_credentials(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                calls = []
+                def mock_api(asset, creds, _p=platform):
+                    calls.append((asset, creds))
+                    return {"success": True, "asset_ref": "x"}
+                creds = self._FULL_CREDS[platform]
+                mod.upload_asset(self._ASSET, creds, _upload_api=mock_api)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(calls[0][0], self._ASSET)
+                self.assertEqual(calls[0][1], creds)
+
+    # --- Injected _upload_api (failure) -------------------------------------
+
+    def test_mock_api_failure_forwarded(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                mock_api = lambda a, c: {
+                    "success": False, "error_code": "RATE_LIMITED", "message": "slow"
+                }
+                result = mod.upload_asset(
+                    self._ASSET, self._FULL_CREDS[platform], _upload_api=mock_api
+                )
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error_code"], "RATE_LIMITED")
+
+    # --- Exception handling -------------------------------------------------
+
+    def test_runtime_error_returns_media_upload_failed(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                def mock_api(a, c):
+                    raise RuntimeError("network fail")
+                result = mod.upload_asset(
+                    self._ASSET, self._FULL_CREDS[platform], _upload_api=mock_api
+                )
+                self.assertFalse(result["success"])
+                self.assertEqual(result["error_code"], "MEDIA_UPLOAD_FAILED")
+
+    def test_not_implemented_exception_from_api_returns_upload_not_implemented(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                def mock_api(a, c):
+                    raise NotImplementedError("not done")
+                result = mod.upload_asset(
+                    self._ASSET, self._FULL_CREDS[platform], _upload_api=mock_api
+                )
+                self.assertEqual(result["error_code"], "UPLOAD_NOT_IMPLEMENTED")
+
+    # --- Result shape -------------------------------------------------------
+
+    def test_success_result_has_required_keys(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                mock_api = lambda a, c: {"success": True, "asset_ref": "ref"}
+                result = mod.upload_asset(
+                    self._ASSET, self._FULL_CREDS[platform], _upload_api=mock_api
+                )
+                self.assertIn("success", result)
+                self.assertIn("asset_ref", result)
+
+    def test_failure_result_has_required_keys(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                result = mod.upload_asset(self._ASSET, {})
+                self.assertIn("success", result)
+                self.assertIn("error_code", result)
+                self.assertIn("message", result)
+
+    def test_success_field_is_bool(self):
+        for platform in self._PLATFORMS:
+            with self.subTest(platform=platform):
+                mod = self._import_module(platform)
+                result = mod.upload_asset(self._ASSET, {})
+                self.assertIsInstance(result["success"], bool)
 
 
 if __name__ == "__main__":
