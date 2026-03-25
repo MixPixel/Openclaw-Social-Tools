@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AssetPolicy",
+  "description": "Schema for config/asset_policy.json. Defines provenance/licensing rules (where assets may come from, what license metadata is required) and usage/edit protection rules (what may be done to each asset type).",
+  "type": "object",
+  "required": [
+    "version",
+    "approved_source_domains",
+    "forbidden_url_patterns",
+    "required_license_fields",
+    "require_alt_text",
+    "usage_policies"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Policy version string (semver recommended). Increment when rules change."
+    },
+    "approved_source_domains": {
+      "type": "array",
+      "description": "Hostnames from which assets may be sourced. Checked against the asset's source URL domain. Subdomains are included implicitly.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "forbidden_url_patterns": {
+      "type": "array",
+      "description": "Regex patterns matched against a source URL. A match means the asset may not be used. Patterns are evaluated case-insensitively.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "required_license_fields": {
+      "type": "array",
+      "description": "Field names that must be present on an asset's license record when require_license is true for that asset type.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "require_alt_text": {
+      "type": "boolean",
+      "description": "If true, every asset attached to a post must carry a non-empty alt_text value."
+    },
+    "usage_policies": {
+      "type": "object",
+      "description": "Per-asset-type usage and edit rules. Keys are asset type slugs (e.g. 'logo', 'stock_photo'). Any key is valid; conventional types are defined in the spec.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/definitions/UsagePolicy"
+      }
+    },
+    "_notes": {
+      "type": "string",
+      "description": "Free-text notes, caveats, or TODO items for this policy file."
+    }
+  },
+  "definitions": {
+    "UsagePolicy": {
+      "title": "UsagePolicy",
+      "description": "Edit and usage rules for a single asset type.",
+      "type": "object",
+      "required": [
+        "edit_rule",
+        "require_license",
+        "require_attribution",
+        "allowed_contexts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "edit_rule": {
+          "type": "string",
+          "enum": [
+            "locked",
+            "resizable_only",
+            "croppable_only",
+            "editable",
+            "reference_only"
+          ],
+          "description": "Permitted modification level. 'locked' = no changes at all; 'resizable_only' = dimensions only; 'croppable_only' = crop only; 'editable' = any edit allowed; 'reference_only' = display/reference use, not for production publishing."
+        },
+        "require_license": {
+          "type": "boolean",
+          "description": "If true, an asset of this type must have a license record with all required_license_fields populated before use."
+        },
+        "require_attribution": {
+          "type": "boolean",
+          "description": "If true, the asset's attribution string must be present and must appear in published content."
+        },
+        "allowed_contexts": {
+          "type": "array",
+          "description": "Publishing contexts where this asset type may be used. Conventional values: 'social_post', 'website', 'email', 'blog', 'press'.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "_notes": {
+          "type": "string",
+          "description": "Free-text notes for this specific asset type policy."
+        }
+      }
+    }
+  }
+}

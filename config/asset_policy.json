@@ -1,0 +1,87 @@
+{
+  "version": "1.0",
+
+  "approved_source_domains": [
+    "openclaw.io",
+    "assets.openclaw.io",
+    "unsplash.com",
+    "PLACEHOLDER — add further approved stock or asset hosting domains"
+  ],
+
+  "forbidden_url_patterns": [
+    "shutterstock\\.com",
+    "gettyimages\\.com",
+    "istockphoto\\.com",
+    "PLACEHOLDER — add patterns for any sources that require paid licensing not yet cleared"
+  ],
+
+  "required_license_fields": [
+    "license_type",
+    "license_url",
+    "attribution"
+  ],
+
+  "require_alt_text": true,
+
+  "usage_policies": {
+
+    "logo": {
+      "edit_rule": "locked",
+      "require_license": false,
+      "require_attribution": false,
+      "allowed_contexts": ["social_post", "website", "email", "press"],
+      "_notes": "Brand logo. Must not be modified in any way — no recolouring, cropping, scaling beyond approved sizes, or overlays. Use only files from assets/logo/."
+    },
+
+    "product_photo": {
+      "edit_rule": "resizable_only",
+      "require_license": false,
+      "require_attribution": false,
+      "allowed_contexts": ["social_post", "website", "email"],
+      "_notes": "PLACEHOLDER — confirm whether cropping is also permitted; update edit_rule to 'editable' or 'croppable_only' after brand-team review."
+    },
+
+    "website_screenshot": {
+      "edit_rule": "reference_only",
+      "require_license": false,
+      "require_attribution": false,
+      "allowed_contexts": ["social_post", "blog"],
+      "_notes": "Screenshots are for illustration/reference only. Do not use as hero images or primary creative. Legal review required before commercial use."
+    },
+
+    "generated_graphic": {
+      "edit_rule": "editable",
+      "require_license": false,
+      "require_attribution": false,
+      "allowed_contexts": ["social_post", "website", "email", "blog"],
+      "_notes": "AI-generated or tool-generated graphics owned by OpenClaw. Full editing permitted. Confirm output ownership before first publish on each generation tool."
+    },
+
+    "customer_photo": {
+      "edit_rule": "croppable_only",
+      "require_license": true,
+      "require_attribution": true,
+      "allowed_contexts": ["social_post"],
+      "_notes": "Requires explicit written permission from the customer before any use. Record permission reference in the license record. Only cropping to fit platform aspect ratios is permitted; no filters, overlays, or colour edits."
+    },
+
+    "stock_photo": {
+      "edit_rule": "resizable_only",
+      "require_license": true,
+      "require_attribution": true,
+      "allowed_contexts": ["social_post", "website", "email", "blog"],
+      "_notes": "PLACEHOLDER — confirm permitted edit operations and required attribution format per stock provider. Some licences allow cropping; update edit_rule if confirmed."
+    },
+
+    "icon": {
+      "edit_rule": "editable",
+      "require_license": true,
+      "require_attribution": false,
+      "allowed_contexts": ["social_post", "website", "email"],
+      "_notes": "PLACEHOLDER — confirm license requirements per icon set (e.g. Feather Icons MIT vs Font Awesome Pro). Update require_attribution per licence."
+    }
+
+  },
+
+  "_notes": "PLACEHOLDER values that need real decisions before launch: approved_source_domains (confirm full list), forbidden_url_patterns (confirm full blocklist), product_photo.edit_rule (crop permitted?), stock_photo.edit_rule (crop permitted?), icon.require_attribution (check licence per icon set)."
+}
