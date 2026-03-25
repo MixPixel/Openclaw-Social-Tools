@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PlatformConfig",
+  "description": "Schema for a single platform configuration file in config/platforms/.",
+  "type": "object",
+  "required": [
+    "platform_id",
+    "display_name",
+    "char_limit",
+    "link_char_cost",
+    "hashtag_limit",
+    "hashtag_warn_above",
+    "links_clickable",
+    "aliases",
+    "media"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "platform_id": {
+      "type": "string",
+      "description": "Canonical internal identifier (e.g. 'twitter', 'mastodon')."
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Human-readable platform name shown in error messages."
+    },
+    "char_limit": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum post character count after link substitution."
+    },
+    "link_char_cost": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Fixed character cost per URL (e.g. 23 for t.co). null means URLs counted at actual length."
+    },
+    "hashtag_limit": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Hard maximum number of hashtags. null means no enforced limit."
+    },
+    "hashtag_warn_above": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Issue a warning when hashtag count exceeds this. null means no warning threshold."
+    },
+    "links_clickable": {
+      "type": "boolean",
+      "description": "Whether links in post body are rendered as clickable hyperlinks."
+    },
+    "aliases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "All input strings (lowercase) that should map to this platform (includes platform_id itself).",
+      "minItems": 1
+    },
+    "media": {
+      "type": "object",
+      "required": [
+        "max_images",
+        "max_videos",
+        "images_and_video_exclusive",
+        "allowed_image_formats",
+        "allowed_video_formats",
+        "max_image_size_bytes",
+        "max_video_size_bytes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_images": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_videos": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "images_and_video_exclusive": {
+          "type": "boolean",
+          "description": "True if a post cannot mix images and video in the same post."
+        },
+        "allowed_image_formats": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lowercase file extensions without dot (e.g. 'jpeg', 'png')."
+        },
+        "allowed_video_formats": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "max_image_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_video_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_image_width_px": {
+          "type": ["integer", "null"],
+          "description": "Minimum image width in pixels. null means no enforced minimum. PLACEHOLDER — verify with platform docs."
+        },
+        "min_image_height_px": {
+          "type": ["integer", "null"],
+          "description": "Minimum image height in pixels. null means no enforced minimum. PLACEHOLDER — verify with platform docs."
+        },
+        "max_image_width_px": {
+          "type": ["integer", "null"],
+          "description": "Maximum image width in pixels. null means no enforced maximum. PLACEHOLDER — verify with platform docs."
+        },
+        "max_image_height_px": {
+          "type": ["integer", "null"],
+          "description": "Maximum image height in pixels. null means no enforced maximum. PLACEHOLDER — verify with platform docs."
+        }
+      }
+    },
+    "scheduling": {
+      "type": "object",
+      "description": "Optional platform-specific scheduling hints. PLACEHOLDER — extend when scheduling rules diverge per platform.",
+      "additionalProperties": true
+    },
+    "_notes": {
+      "type": "string",
+      "description": "Free-text notes, caveats, or TODO items for this platform file."
+    }
+  }
+}

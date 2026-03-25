@@ -1,0 +1,24 @@
+{
+  "platform_id": "facebook",
+  "display_name": "Facebook",
+  "char_limit": 63206,
+  "link_char_cost": null,
+  "hashtag_limit": null,
+  "hashtag_warn_above": null,
+  "links_clickable": true,
+  "aliases": ["facebook"],
+  "media": {
+    "max_images": 10,
+    "max_videos": 1,
+    "images_and_video_exclusive": true,
+    "allowed_image_formats": ["jpeg", "jpg", "png", "gif", "bmp", "tiff"],
+    "allowed_video_formats": ["mp4", "mov", "avi"],
+    "max_image_size_bytes": 10485760,
+    "max_video_size_bytes": 10737418240,
+    "min_image_width_px": null,
+    "min_image_height_px": null,
+    "max_image_width_px": null,
+    "max_image_height_px": null
+  },
+  "_notes": "char_limit=63206 is the documented Facebook post character limit. max_image_size_bytes=10 MB. max_video_size_bytes=10 GB (Facebook supports very large video files). hashtag_warn_above=null: Facebook does not have a well-established hashtag best-practice threshold (PLACEHOLDER — set if brand guidelines dictate)."
+}

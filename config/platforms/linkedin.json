@@ -1,0 +1,24 @@
+{
+  "platform_id": "linkedin",
+  "display_name": "LinkedIn",
+  "char_limit": 3000,
+  "link_char_cost": null,
+  "hashtag_limit": null,
+  "hashtag_warn_above": 5,
+  "links_clickable": true,
+  "aliases": ["linkedin"],
+  "media": {
+    "max_images": 9,
+    "max_videos": 1,
+    "images_and_video_exclusive": true,
+    "allowed_image_formats": ["jpeg", "jpg", "png", "gif"],
+    "allowed_video_formats": ["mp4", "mov", "avi", "mkv"],
+    "max_image_size_bytes": 8388608,
+    "max_video_size_bytes": 209715200,
+    "min_image_width_px": null,
+    "min_image_height_px": null,
+    "max_image_width_px": null,
+    "max_image_height_px": null
+  },
+  "_notes": "link_char_cost=null: LinkedIn renders links at actual character length. max_image_size_bytes=8 MB. max_video_size_bytes=200 MB. LinkedIn document posts (PDF carousels) are not covered here — separate media type if needed (PLACEHOLDER)."
+}

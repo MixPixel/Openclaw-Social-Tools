@@ -1,0 +1,24 @@
+{
+  "platform_id": "instagram",
+  "display_name": "Instagram",
+  "char_limit": 2200,
+  "link_char_cost": null,
+  "hashtag_limit": 30,
+  "hashtag_warn_above": 10,
+  "links_clickable": false,
+  "aliases": ["instagram"],
+  "media": {
+    "max_images": 10,
+    "max_videos": 10,
+    "images_and_video_exclusive": false,
+    "allowed_image_formats": ["jpeg", "jpg", "png"],
+    "allowed_video_formats": ["mp4", "mov"],
+    "max_image_size_bytes": 8388608,
+    "max_video_size_bytes": 104857600,
+    "min_image_width_px": 320,
+    "min_image_height_px": null,
+    "max_image_width_px": 1440,
+    "max_image_height_px": null
+  },
+  "_notes": "links_clickable=false: URLs in captions are not hyperlinked; direct users to link-in-bio. max_image_size_bytes=8 MB. max_video_size_bytes=100 MB. images_and_video_exclusive=false allows mixed carousel posts. min/max image dimensions sourced from Instagram Graph API docs — verify if restrictions change (PLACEHOLDER for height limits)."
+}

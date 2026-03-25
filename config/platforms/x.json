@@ -1,0 +1,24 @@
+{
+  "platform_id": "twitter",
+  "display_name": "Twitter / X",
+  "char_limit": 280,
+  "link_char_cost": 23,
+  "hashtag_limit": null,
+  "hashtag_warn_above": 3,
+  "links_clickable": true,
+  "aliases": ["twitter", "x", "twitter/x", "x/twitter"],
+  "media": {
+    "max_images": 4,
+    "max_videos": 1,
+    "images_and_video_exclusive": true,
+    "allowed_image_formats": ["jpeg", "jpg", "png", "gif", "webp"],
+    "allowed_video_formats": ["mp4", "mov"],
+    "max_image_size_bytes": 5242880,
+    "max_video_size_bytes": 536870912,
+    "min_image_width_px": null,
+    "min_image_height_px": null,
+    "max_image_width_px": null,
+    "max_image_height_px": null
+  },
+  "_notes": "link_char_cost=23 reflects t.co URL shortening. All URLs regardless of actual length count as 23 characters. max_video_size_bytes=512 MB. Image dimension limits are not enforced by this config — verify current Twitter API docs if needed (PLACEHOLDER)."
+}
