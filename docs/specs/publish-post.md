@@ -345,3 +345,55 @@ result = publish_post(
     _adapter=my_twitter_adapter,
 )
 ```
+
+---
+
+## Using the Platform Adapter Layer
+
+The `tools/platform_adapters` package provides the production-ready adapter boundary.
+It keeps platform-specific HTTP logic, credential management, and error normalisation
+outside of `publish_post`.
+
+### Development and testing (no network)
+
+```python
+from tools.platform_adapters import StubAdapter
+from tools.publish_post import publish_post
+
+# Always succeeds:
+result = publish_post(data, _adapter=StubAdapter())
+
+# Configurable failure:
+result = publish_post(data, _adapter=StubAdapter(
+    success=False,
+    error_code="RATE_LIMITED",
+    message="too many requests",
+))
+```
+
+### Production (all platforms, credentials from environment)
+
+```python
+from tools.platform_adapters import get_dispatch_adapter
+from tools.publish_post import publish_post
+
+adapter = get_dispatch_adapter()   # reads PLATFORM_* env vars at call time
+result = publish_post(data, _adapter=adapter)
+```
+
+### Single platform with explicit credentials
+
+```python
+from tools.platform_adapters import get_adapter
+from tools.publish_post import publish_post
+
+adapter = get_adapter("mastodon", credentials={
+    "MASTODON_ACCESS_TOKEN":  "my_token",
+    "MASTODON_INSTANCE_URL":  "https://mastodon.social",
+})
+result = publish_post(data, _adapter=adapter)
+```
+
+`get_dispatch_adapter` is preferred for mixed-platform queues; it routes each entry
+to the correct per-platform adapter based on `entry["platform"]` and returns a clean
+`UNKNOWN_ERROR` failure dict for unrecognised platforms rather than raising.
