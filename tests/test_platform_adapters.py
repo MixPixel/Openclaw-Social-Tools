@@ -528,7 +528,10 @@ class TestPlatformModuleShapes(unittest.TestCase):
                 self.assertTrue(callable(mod.get_adapter))
 
     def test_build_payload_raises_not_implemented(self):
+        # twitter._build_payload is implemented (Step 10); remaining platforms are stubs.
         for platform in self._PLATFORMS:
+            if platform == "twitter":
+                continue
             with self.subTest(platform=platform):
                 mod = self._import_module(platform)
                 with self.assertRaises(NotImplementedError,
@@ -536,7 +539,10 @@ class TestPlatformModuleShapes(unittest.TestCase):
                     mod._build_payload(_ENTRY)
 
     def test_parse_response_raises_not_implemented(self):
+        # twitter._parse_response is implemented (Step 10); remaining platforms are stubs.
         for platform in self._PLATFORMS:
+            if platform == "twitter":
+                continue
             with self.subTest(platform=platform):
                 mod = self._import_module(platform)
                 with self.assertRaises(NotImplementedError,
@@ -553,7 +559,11 @@ class TestPlatformModuleShapes(unittest.TestCase):
                 )
 
     def test_platform_adapter_raises_not_implemented_with_full_creds(self):
-        """With valid credentials, __call__ raises NotImplementedError (skeleton)."""
+        """With valid credentials, __call__ raises NotImplementedError (skeleton).
+
+        twitter is excluded: its delivery is implemented in Step 10 and makes
+        real HTTP calls rather than raising NotImplementedError.
+        """
         full_creds = {
             "twitter":   {
                 "TWITTER_API_KEY": "k", "TWITTER_API_SECRET": "s",
@@ -574,6 +584,8 @@ class TestPlatformModuleShapes(unittest.TestCase):
             },
         }
         for platform in self._PLATFORMS:
+            if platform == "twitter":
+                continue  # twitter delivery implemented in Step 10
             with self.subTest(platform=platform):
                 adapter = get_adapter(platform, credentials=full_creds[platform])
                 with self.assertRaises(NotImplementedError,
@@ -658,7 +670,12 @@ class TestAdapterUploadAsset(unittest.TestCase):
     # --- Default API (NotImplementedError → UPLOAD_NOT_IMPLEMENTED) ---------
 
     def test_full_creds_default_api_returns_upload_not_implemented(self):
+        # twitter upload_asset is implemented (Step 10) and returns MEDIA_UPLOAD_FAILED
+        # when no file_path is provided, not UPLOAD_NOT_IMPLEMENTED.  Other platforms
+        # still return UPLOAD_NOT_IMPLEMENTED from their stubs.
         for platform in self._PLATFORMS:
+            if platform == "twitter":
+                continue
             with self.subTest(platform=platform):
                 mod = self._import_module(platform)
                 creds = self._FULL_CREDS[platform]

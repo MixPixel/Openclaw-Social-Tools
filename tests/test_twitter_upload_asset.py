@@ -105,11 +105,16 @@ class TestCredentials(unittest.TestCase):
         self.assertIn("TWITTER_ACCESS_SECRET", result["message"])
 
     def test_full_credentials_reach_upload_api(self):
-        """With full creds, the default API is called (raises NotImplementedError)."""
+        """With full creds, the default API is called.
+
+        _call_twitter_upload_api is now implemented (Step 10).  It requires
+        a 'file_path' in the asset dict; without one it returns MEDIA_UPLOAD_FAILED
+        immediately rather than raising NotImplementedError.
+        """
         result = twitter_upload_asset(_VALID_LOGO, _FULL_CREDS)
-        # Default _call_twitter_upload_api raises NotImplementedError
+        # No file_path in _VALID_LOGO → MEDIA_UPLOAD_FAILED from the real upload impl.
         self.assertFalse(result["success"])
-        self.assertEqual(result["error_code"], "UPLOAD_NOT_IMPLEMENTED")
+        self.assertEqual(result["error_code"], "MEDIA_UPLOAD_FAILED")
 
     def test_empty_string_credential_treated_as_missing(self):
         creds = {k: "" for k in REQUIRED_CREDENTIALS}
@@ -122,21 +127,27 @@ class TestCredentials(unittest.TestCase):
 # TestDefaultApiNotImplemented
 # ---------------------------------------------------------------------------
 
-class TestDefaultApiNotImplemented(unittest.TestCase):
+class TestDefaultApiRequiresFilePath(unittest.TestCase):
+    """_call_twitter_upload_api is implemented (Step 10).
 
-    def test_default_api_returns_upload_not_implemented(self):
+    Without a 'file_path' in the asset it returns MEDIA_UPLOAD_FAILED
+    immediately.  Tests that previously checked for UPLOAD_NOT_IMPLEMENTED
+    are updated to reflect the real implementation.
+    """
+
+    def test_no_file_path_returns_media_upload_failed(self):
         result = twitter_upload_asset(_VALID_LOGO, _FULL_CREDS)
         self.assertFalse(result["success"])
-        self.assertEqual(result["error_code"], "UPLOAD_NOT_IMPLEMENTED")
+        self.assertEqual(result["error_code"], "MEDIA_UPLOAD_FAILED")
 
-    def test_upload_not_implemented_message_is_non_empty(self):
+    def test_no_file_path_message_is_non_empty(self):
         result = twitter_upload_asset(_VALID_LOGO, _FULL_CREDS)
         self.assertIsInstance(result["message"], str)
         self.assertGreater(len(result["message"]), 0)
 
-    def test_upload_not_implemented_mentions_twitter(self):
+    def test_no_file_path_message_mentions_file_path(self):
         result = twitter_upload_asset(_VALID_LOGO, _FULL_CREDS)
-        self.assertIn("Twitter", result["message"])
+        self.assertIn("file_path", result["message"])
 
 
 # ---------------------------------------------------------------------------
@@ -376,16 +387,20 @@ class TestIntegrationViaOrchestrator(_PolicyFileMixin, unittest.TestCase):
         self.assertNotEqual(result["validation_errors"], [])
 
     def test_not_implemented_surfaces_through_orchestrator(self):
-        """Default API (NotImplementedError) → UPLOAD_NOT_IMPLEMENTED in orchestrator."""
-        # No credentials patch; _call_twitter_upload_api is real (raises NotImplementedError)
+        """Default API without file_path → MEDIA_UPLOAD_FAILED in orchestrator.
+
+        _call_twitter_upload_api is now implemented (Step 10).  When the asset
+        has no 'file_path', it returns MEDIA_UPLOAD_FAILED rather than raising
+        NotImplementedError.
+        """
         result = orchestrate_upload(
-            _VALID_LOGO,
+            _VALID_LOGO,  # no file_path → MEDIA_UPLOAD_FAILED
             "twitter",
             credentials=_FULL_CREDS,
             policy_path=self._policy_path,
         )
         codes = [e["code"] for e in result["errors"]]
-        self.assertIn("UPLOAD_NOT_IMPLEMENTED", codes)
+        self.assertIn("MEDIA_UPLOAD_FAILED", codes)
 
 
 if __name__ == "__main__":
