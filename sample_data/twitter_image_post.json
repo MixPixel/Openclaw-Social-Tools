@@ -1,0 +1,12 @@
+{
+  "content": "Check out our latest product! Available now.",
+  "media": [
+    {
+      "asset_type": "product_photo",
+      "format": "png",
+      "alt_text": "Product photo showing the new OpenClaw interface on a laptop screen",
+      "context": "social_post",
+      "file_path": "/path/to/your/image.png"
+    }
+  ]
+}

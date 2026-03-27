@@ -73,12 +73,39 @@ wrong type.  Called internally before returning; tests may call it directly.
     "content":  str,   # post body text / caption
 
     # Optional:
-    "media":    list,  # asset dicts forwarded to upload_asset
+    "media":    list,  # see Media item shape below
     "hashtags": list,
     "mentions": list,
     "links":    list,
 }
 ```
+
+### Media item shape
+
+Each entry in `media` is passed verbatim to `upload_asset`, which passes it
+through `validate_asset` (policy/capability check) and then to the platform
+adapter's `upload_asset()` function. The adapter reads the file at `file_path`.
+
+```python
+{
+    # Transport — required by the platform adapter:
+    "file_path":  str,   # absolute or relative path to image file on disk
+
+    # Policy — required by validate_asset:
+    "asset_type": str,   # e.g. "product_photo", "logo", "generated_graphic"
+    "format":     str,   # lowercase extension without dot: "png", "jpeg", "gif", "webp"
+    "alt_text":   str,   # required when asset policy sets require_alt_text: true
+    "context":    str,   # publishing context, e.g. "social_post"
+
+    # Optional policy fields:
+    "source_url":   str,   # origin URL for provenance checking
+    "license":      dict,  # license record; required for some asset types
+    "edit_applied": str,   # edit operation applied, e.g. "resize"
+}
+```
+
+`file_path` is not validated by `validate_asset`. It is read by the adapter at
+upload time. A missing or unreadable `file_path` returns `MEDIA_UPLOAD_FAILED`.
 
 ---
 

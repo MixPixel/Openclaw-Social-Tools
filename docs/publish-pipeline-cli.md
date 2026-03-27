@@ -69,16 +69,52 @@ Lines without `=` are silently skipped.
 
 ## `post.json` format
 
+### Text post
+
 ```json
 {
-  "content": "Post text here"
+  "content": "Hello from OpenClaw!"
 }
 ```
 
 `platform` can be in the JSON or supplied with `--platform`. The flag overrides
 the JSON field when both are present.
 
-Optional fields (passed through to the adapter):
+### Image post
+
+Add a `media` array. Each item must include `file_path` (path to the image on
+disk) plus the metadata fields that the asset policy requires:
+
+```json
+{
+  "content": "Check out this photo!",
+  "media": [
+    {
+      "asset_type": "product_photo",
+      "format": "png",
+      "alt_text": "Description of the image for accessibility",
+      "context": "social_post",
+      "file_path": "/absolute/or/relative/path/to/image.png"
+    }
+  ]
+}
+```
+
+**Required media fields:**
+
+| Field | Notes |
+|-------|-------|
+| `asset_type` | Must match a type in `config/asset_policy.json`: `logo`, `product_photo`, `generated_graphic`, `website_screenshot`, `customer_photo`, `stock_photo`, `icon` |
+| `format` | Lowercase extension without dot. Twitter accepts: `jpeg`, `jpg`, `png`, `gif`, `webp` |
+| `alt_text` | Required by the global asset policy (`require_alt_text: true`). Must be non-empty. |
+| `context` | Publishing context. Use `"social_post"`. Validated against the asset type's `allowed_contexts`. |
+| `file_path` | Path to the image file on disk. The file must exist and be readable at publish time. |
+
+Up to 4 images per tweet. Images and video cannot be mixed in the same post.
+
+A sample is at `sample_data/twitter_image_post.json`.
+
+### Optional text fields
 
 ```json
 {
@@ -144,9 +180,12 @@ and `message`. Common codes:
 
 ## Current limitations
 
-- **Text posts only.** Media uploads via `file_path` are implemented in the
-  adapter but there is no documented end-to-end example for image or video posts.
+- **Images only (no video).** The Twitter adapter uses simple base64 upload,
+  which supports JPEG, PNG, GIF, and WebP up to 5 MB. Video requires chunked
+  upload, which is not yet implemented.
 - **Twitter only.** Other platforms fail at the delivery stage with
-  `NOT_IMPLEMENTED`.
+  `ADAPTER_EXCEPTION`.
 - **No retry logic.** Check `retryable: true` in the error object and re-run
   manually for rate-limit or transient network errors.
+- **Local files only.** Remote URLs must be downloaded to disk before
+  referencing them in `file_path`.
