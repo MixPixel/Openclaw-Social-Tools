@@ -337,7 +337,7 @@ def publish_post(data: dict, *, _adapter=None) -> dict:
 # Pipeline adapter factory
 # ---------------------------------------------------------------------------
 
-def get_pipeline_adapter(credentials=None, policy_path=None):
+def get_pipeline_adapter(credentials=None, policy_path=None, dry_run=False):
     """Return an adapter callable that delivers via the full publish_to_platform pipeline.
 
     The returned callable satisfies the adapter contract expected by publish_post:
@@ -372,6 +372,7 @@ def get_pipeline_adapter(credentials=None, policy_path=None):
             post,
             credentials=credentials,
             policy_path=policy_path,
+            dry_run=dry_run,
         )
 
         if result.get("success"):

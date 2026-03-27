@@ -70,6 +70,7 @@ Failure taxonomy
 from typing import Optional
 
 from tools.validate_post import validate_post as _validate_post
+from tools.validate_asset import validate_asset as _validate_asset
 from tools.upload_asset import upload_asset as _upload_asset
 from tools.platform_adapters.registry import get_adapter as _get_adapter
 
@@ -128,6 +129,7 @@ def publish_to_platform(
     credentials: Optional[dict] = None,
     policy_path=None,
     _adapter=None,
+    dry_run: bool = False,
 ) -> dict:
     """Validate, upload media, and publish a post to one platform.
 
@@ -225,10 +227,62 @@ def publish_to_platform(
         )
 
     # ------------------------------------------------------------------
-    # Stage 2 — upload media
+    # Stage 2 — upload media  (dry-run: validate policy, skip HTTP)
     # ------------------------------------------------------------------
     raw_media = post.get("media") or []
     media_results: list[dict] = []
+
+    if dry_run:
+        # Validate each media item's policy without uploading or reading the
+        # file.  Synthesise a "dry_run_N" asset_ref so the rest of the result
+        # shape is identical to a real run.
+        for i, media_item in enumerate(raw_media):
+            va = _validate_asset(media_item, platform_out, policy_path=policy_path)
+            if va.get("valid"):
+                media_results.append({
+                    "asset_type":        va.get("asset_type"),
+                    "asset_ref":         f"dry_run_{i}",
+                    "success":           True,
+                    "errors":            [],
+                    "validation_errors": [],
+                })
+            else:
+                media_results.append({
+                    "asset_type":        va.get("asset_type"),
+                    "asset_ref":         None,
+                    "success":           False,
+                    "errors":            [],
+                    "validation_errors": va.get("errors", []),
+                })
+
+        upload_failures = [m for m in media_results if not m["success"]]
+        if upload_failures:
+            r = _result(
+                False,
+                character_count=char_count,
+                media_results=media_results,
+                errors=[{
+                    "code":    "MEDIA_UPLOAD_FAILED",
+                    "message": (
+                        f"{len(upload_failures)} of {len(media_results)} "
+                        "media upload(s) failed."
+                    ),
+                }],
+                warnings=vr.get("warnings", []),
+            )
+            r["dry_run"] = True
+            return r
+
+        # Stages 3 & 4 skipped — no adapter resolution, no delivery.
+        r = _result(
+            True,
+            post_id=None,
+            character_count=char_count,
+            media_results=media_results,
+            warnings=vr.get("warnings", []),
+        )
+        r["dry_run"] = True
+        return r
 
     for media_item in raw_media:
         ur = _upload_asset(

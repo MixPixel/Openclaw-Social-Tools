@@ -131,6 +131,18 @@ def _main() -> None:
             "Real environment variables always override values from the file."
         ),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        dest="dry_run",
+        help=(
+            "Validate the post and check media policy without making any "
+            "network calls.  Content validation and media policy checks still "
+            "run.  No credentials are needed.  The result includes "
+            "'dry_run: true' and 'post_id: null'."
+        ),
+    )
     args = parser.parse_args()
 
     # Load credentials: .env file first, real env vars win.
@@ -175,7 +187,7 @@ def _main() -> None:
             post["platform"] = args.platform
 
     # credentials=None → each platform adapter reads its required keys from os.environ
-    result = publish_to_platform(post)
+    result = publish_to_platform(post, dry_run=args.dry_run)
     print(json.dumps(result, indent=2))
     sys.exit(0 if result["success"] else 1)
 
