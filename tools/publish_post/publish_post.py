@@ -5,21 +5,30 @@ adapter for each, writes the result back to the queue store, and drives the
 approval state machine from scheduled → posted or scheduled → failed.
 
 Adapter injection is a library-only concern. The public JSON input schema has no
-adapter field — a callable cannot round-trip through JSON. The CLI always uses
-the built-in _stub_adapter.
+adapter field — a callable cannot round-trip through JSON. The CLI uses
+get_pipeline_adapter() by default, which calls publish_to_platform and reads
+credentials from the environment.
 
 Usage (CLI):
     echo '{...}' | python -m tools.publish_post.publish_post
     # exits 0 on success, 1 on system error
 
-Usage (library):
-    from tools.publish_post import publish_post
+Usage (library — real delivery):
+    from tools.publish_post import publish_post, get_pipeline_adapter
 
-    def my_adapter(entry):
-        ...
-        return {"success": True, "platform_post_id": "id", "platform_response": None}
+    adapter = get_pipeline_adapter()              # credentials from os.environ
+    result = publish_post(data, _adapter=adapter)
 
-    result = publish_post(data, _adapter=my_adapter)
+Usage (library — explicit credentials):
+    from tools.publish_post import publish_post, get_pipeline_adapter
+
+    adapter = get_pipeline_adapter(credentials={
+        "TWITTER_API_KEY":       "...",
+        "TWITTER_API_SECRET":    "...",
+        "TWITTER_ACCESS_TOKEN":  "...",
+        "TWITTER_ACCESS_SECRET": "...",
+    })
+    result = publish_post(data, _adapter=adapter)
 """
 
 import json
@@ -27,8 +36,10 @@ import os
 import sys
 import tempfile
 from datetime import datetime, timezone
+from typing import Optional
 
 from tools.approval_state_manager import manage_approval_state
+from tools.publish_pipeline import publish_to_platform as _publish_to_platform
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -323,6 +334,87 @@ def publish_post(data: dict, *, _adapter=None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Pipeline adapter factory
+# ---------------------------------------------------------------------------
+
+def get_pipeline_adapter(credentials=None, policy_path=None):
+    """Return an adapter callable that delivers via the full publish_to_platform pipeline.
+
+    The returned callable satisfies the adapter contract expected by publish_post:
+        (entry: dict) -> {"success": bool, "platform_post_id": str|None, ...}
+
+    It bridges the queue entry shape to publish_to_platform's input, calls the
+    full pipeline (content validation → media upload → platform HTTP delivery),
+    and translates the rich pipeline result back to the adapter contract.
+
+    Args:
+        credentials: Optional dict of platform credentials. None → each platform
+                     adapter reads from os.environ at call time.
+        policy_path: Optional path to asset_policy.json. None → default path.
+
+    Returns:
+        A callable suitable for publish_post(_adapter=...).
+    """
+    def _adapter(entry: dict) -> dict:
+        # Build publish_to_platform input from queue entry.
+        post: dict = {
+            "platform": entry.get("platform"),
+            "content":  entry.get("content"),
+        }
+        # Forward optional fields only when non-empty so the pipeline doesn't
+        # see stale empty lists from queue entries that never had these fields.
+        for key in ("media", "hashtags", "mentions", "links"):
+            value = entry.get(key)
+            if value:
+                post[key] = value
+
+        result = _publish_to_platform(
+            post,
+            credentials=credentials,
+            policy_path=policy_path,
+        )
+
+        if result.get("success"):
+            return {
+                "success":          True,
+                "platform_post_id": result.get("post_id"),
+                "platform_response": {
+                    "character_count": result.get("character_count"),
+                    "media_results":   result.get("media_results"),
+                    "warnings":        result.get("warnings"),
+                },
+            }
+
+        # Map failure: prefer adapter-level errors, then validation errors.
+        errors = result.get("errors") or []
+        validation_errors = result.get("validation_errors") or []
+
+        if errors:
+            error_code = str(errors[0].get("code") or "PUBLISH_FAILED")
+            message    = str(errors[0].get("message") or "")
+        elif validation_errors:
+            error_code = str(validation_errors[0].get("code") or "VALIDATION_FAILED")
+            message    = str(validation_errors[0].get("message") or "")
+        else:
+            error_code = "PUBLISH_FAILED"
+            message    = "publish_to_platform returned success=False with no error details"
+
+        return {
+            "success":    False,
+            "error_code": error_code,
+            "message":    message,
+            "platform_response": {
+                "validation_errors": validation_errors,
+                "media_results":     result.get("media_results"),
+                "errors":            errors,
+                "warnings":          result.get("warnings"),
+            },
+        }
+
+    return _adapter
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -338,8 +430,8 @@ def _main() -> None:
         print(json.dumps(result, indent=2))
         sys.exit(1)
 
-    # CLI always uses _stub_adapter; no adapter injection from JSON payload.
-    result = publish_post(data)
+    # CLI uses the real publish pipeline. Credentials are read from os.environ.
+    result = publish_post(data, _adapter=get_pipeline_adapter())
     print(json.dumps(result, indent=2))
     sys.exit(0 if result.get("success") else 1)
 
