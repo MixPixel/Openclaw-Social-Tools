@@ -540,5 +540,95 @@ class TestQueueLogging(unittest.TestCase):
         self.assertEqual(queue_ids, {"q1", "q2"})
 
 
+# ---------------------------------------------------------------------------
+# TestPublishHistoryCLI
+# ---------------------------------------------------------------------------
+
+class TestPublishHistoryCLI(unittest.TestCase):
+    """python -m tools.publish_history CLI."""
+
+    def setUp(self):
+        self.log_path = _tmp_log()
+        # Seed with three entries: two success, one failure.
+        append_entry({"source": "pipeline", "platform": "twitter",
+                      "success": True,  "dry_run": False, "n": 1},
+                     log_path=self.log_path)
+        append_entry({"source": "queue",    "platform": "twitter",
+                      "success": False, "dry_run": False, "n": 2},
+                     log_path=self.log_path)
+        append_entry({"source": "pipeline", "platform": "mastodon",
+                      "success": True,  "dry_run": True,  "n": 3},
+                     log_path=self.log_path)
+
+    def tearDown(self):
+        try:
+            os.unlink(self.log_path)
+        except FileNotFoundError:
+            pass
+
+    def _run(self, *extra_args) -> tuple[int, list]:
+        cmd = [sys.executable, "-m", "tools.publish_history",
+               "--log-file", self.log_path, *extra_args]
+        env = os.environ.copy()
+        env["PYTHONPATH"] = _REPO_ROOT
+        proc = subprocess.run(cmd, capture_output=True, env=env, cwd=_REPO_ROOT)
+        return proc.returncode, json.loads(proc.stdout.decode())
+
+    def test_exits_0(self):
+        code, _ = self._run()
+        self.assertEqual(code, 0)
+
+    def test_output_is_json_array(self):
+        _, result = self._run()
+        self.assertIsInstance(result, list)
+
+    def test_returns_all_entries_by_default(self):
+        _, result = self._run()
+        self.assertEqual(len(result), 3)
+
+    def test_entries_in_chronological_order(self):
+        _, result = self._run()
+        self.assertEqual([e["n"] for e in result], [1, 2, 3])
+
+    def test_limit_returns_last_n(self):
+        _, result = self._run("--limit", "2")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["n"], 2)
+        self.assertEqual(result[1]["n"], 3)
+
+    def test_failed_only_filters_to_failures(self):
+        _, result = self._run("--failed-only")
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0]["success"])
+
+    def test_failed_only_with_limit(self):
+        # Seed a second failure so we can test limit against failures.
+        append_entry({"source": "queue", "platform": "twitter",
+                      "success": False, "dry_run": False, "n": 4},
+                     log_path=self.log_path)
+        _, result = self._run("--failed-only", "--limit", "1")
+        # --limit applied before --failed-only, so last 1 entry is the new failure
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["n"], 4)
+
+    def test_missing_log_file_returns_empty_array(self):
+        _, result = self._run("--log-file", "/tmp/nonexistent_zzz.jsonl")
+        self.assertEqual(result, [])
+
+    def test_custom_log_file_path(self):
+        other = _tmp_log()
+        try:
+            append_entry({"source": "pipeline", "success": True, "x": 99},
+                         log_path=other)
+            _, result = self._run("--log-file", other)
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]["x"], 99)
+        finally:
+            try:
+                os.unlink(other)
+            except FileNotFoundError:
+                pass
+
+
 if __name__ == "__main__":
     unittest.main()
