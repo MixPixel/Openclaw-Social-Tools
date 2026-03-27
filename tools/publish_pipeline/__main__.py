@@ -43,6 +43,7 @@ import os
 import sys
 
 from .publish_pipeline import publish_to_platform
+from tools.publish_history import append_entry as _append_log_entry
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +144,17 @@ def _main() -> None:
             "'dry_run: true' and 'post_id: null'."
         ),
     )
+    parser.add_argument(
+        "--log-file",
+        metavar="PATH",
+        dest="log_file",
+        default="data/publish_log.jsonl",
+        help=(
+            "Path to the publish history log file (JSONL, one entry per run). "
+            "Defaults to data/publish_log.jsonl.  Pass an empty string to "
+            "suppress logging."
+        ),
+    )
     args = parser.parse_args()
 
     # Load credentials: .env file first, real env vars win.
@@ -189,6 +201,33 @@ def _main() -> None:
     # credentials=None → each platform adapter reads its required keys from os.environ
     result = publish_to_platform(post, dry_run=args.dry_run)
     print(json.dumps(result, indent=2))
+
+    # Write history log entry (empty --log-file suppresses).
+    if args.log_file:
+        errors = result.get("errors") or []
+        val_errors = result.get("validation_errors") or []
+        error_code = None
+        if errors:
+            error_code = str(errors[0].get("code", ""))
+        elif val_errors:
+            error_code = str(val_errors[0].get("code", ""))
+        try:
+            _append_log_entry(
+                {
+                    "source":          "pipeline",
+                    "dry_run":         args.dry_run,
+                    "platform":        result.get("platform", ""),
+                    "success":         bool(result.get("success")),
+                    "post_id":         result.get("post_id"),
+                    "character_count": result.get("character_count"),
+                    "media_count":     len(result.get("media_results") or []),
+                    "error_code":      error_code,
+                },
+                log_path=args.log_file,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Warning: could not write publish log: {exc}", file=sys.stderr)
+
     sys.exit(0 if result["success"] else 1)
 
 

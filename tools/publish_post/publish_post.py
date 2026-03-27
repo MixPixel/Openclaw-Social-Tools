@@ -39,13 +39,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from tools.approval_state_manager import manage_approval_state
+from tools.publish_history import append_entry as _append_log_entry
 from tools.publish_pipeline import publish_to_platform as _publish_to_platform
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_QUEUE_STORE_PATH = "data/queue.json"
+DEFAULT_QUEUE_STORE_PATH    = "data/queue.json"
 DEFAULT_APPROVAL_STORE_PATH = "data/approval_states.json"
 
 # ---------------------------------------------------------------------------
@@ -148,6 +149,7 @@ def publish_post(data: dict, *, _adapter=None) -> dict:
     dry_run: bool = bool(data.get("dry_run", False))
     retry_failed: bool = bool(data.get("retry_failed", False))
     queue_ids_raw = data.get("queue_ids")  # None or list[str]
+    log_path: Optional[str] = data.get("log_path") or None  # None → skip logging
 
     # --- Resolve now ---
     now_raw: str = str(data.get("now") or "")
@@ -320,6 +322,31 @@ def publish_post(data: dict, *, _adapter=None) -> dict:
             results.append(r)
             counters["failed"] += 1
 
+    # --- Write history log entries (one per result; skipped when log_path is None) ---
+    if log_path is not None:
+        for r in results:
+            outcome = r.get("outcome", "")
+            success = outcome in ("posted", "already_posted")
+            try:
+                _append_log_entry(
+                    {
+                        "logged_at":       timestamp_iso,
+                        "source":          "queue",
+                        "dry_run":         dry_run,
+                        "platform":        r.get("platform", ""),
+                        "success":         success,
+                        "outcome":         outcome,
+                        "queue_id":        r.get("queue_id", ""),
+                        "post_id":         r.get("post_id", ""),
+                        "slot":            r.get("slot", ""),
+                        "platform_post_id": r.get("platform_post_id"),
+                        "error_code":      r.get("error_code"),
+                    },
+                    log_path=log_path,
+                )
+            except Exception:  # noqa: BLE001
+                pass  # log failure never fails the publish run
+
     return {
         "success":        True,
         "now":            now_utc.isoformat(),
@@ -432,6 +459,9 @@ def _main() -> None:
         sys.exit(1)
 
     # CLI uses the real publish pipeline. Credentials are read from os.environ.
+    # Default log_path so the CLI always records history; callers can override.
+    if "log_path" not in data:
+        data["log_path"] = "data/publish_log.jsonl"
     result = publish_post(data, _adapter=get_pipeline_adapter())
     print(json.dumps(result, indent=2))
     sys.exit(0 if result.get("success") else 1)
