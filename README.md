@@ -45,15 +45,40 @@ Each box is a deterministic tool. The LLM is only invoked at the points marked `
 
 ---
 
+## Quickstart
+
+Publish a text post to Twitter:
+
+```bash
+# 1. Add credentials
+echo "TWITTER_API_KEY=..." >> .env
+echo "TWITTER_API_SECRET=..." >> .env
+echo "TWITTER_ACCESS_TOKEN=..." >> .env
+echo "TWITTER_ACCESS_SECRET=..." >> .env
+
+# 2. Run
+echo '{"content": "Hello from OpenClaw!"}' \
+  | python -m tools.publish_pipeline --platform twitter
+```
+
+See [docs/publish-pipeline-cli.md](docs/publish-pipeline-cli.md) for the full
+CLI reference including `.env` format, result shape, and current limitations.
+
+---
+
 ## Tools
 
-| Tool | Spec | Purpose |
+| Tool | Spec | Status |
 |---|---|---|
-| `content-brief-builder` | [spec](docs/specs/content-brief-builder.md) | Assembles a structured brief to feed into the LLM |
-| `validate-post` | [spec](docs/specs/validate-post.md) | Checks a draft against platform rules |
-| `approval-state-manager` | [spec](docs/specs/approval-state-manager.md) | Manages draft → approved state transitions |
-| `find-next-slot` | [spec](docs/specs/find-next-slot.md) | Returns the next available posting slot |
-| `schedule-post` | [spec](docs/specs/schedule-post.md) | Writes an approved post to the scheduling queue |
+| `publish_pipeline` | [spec](docs/specs/publish-pipeline.md) | Twitter delivery working; other platforms stubbed |
+| `validate-post` | [spec](docs/specs/validate-post.md) | Complete |
+| `validate-asset` | [spec](docs/specs/validate-asset.md) | Complete |
+| `upload-asset` | [spec](docs/specs/upload-asset.md) | Complete (Twitter); others stubbed |
+| `approval-state-manager` | [spec](docs/specs/approval-state-manager.md) | Complete |
+| `find-next-slot` | [spec](docs/specs/find-next-slot.md) | Complete |
+| `schedule-post` | [spec](docs/specs/schedule-post.md) | Complete |
+| `publish-post` | [spec](docs/specs/publish-post.md) | Queue works; not wired to live delivery |
+| `content-brief-builder` | [spec](docs/specs/content-brief-builder.md) | Not yet implemented |
 
 ---
 
@@ -62,21 +87,20 @@ Each box is a deterministic tool. The LLM is only invoked at the points marked `
 ```
 Openclaw-Social-Tools/
 ├── docs/
-│   ├── architecture.md       # Design principles and workflow diagram
-│   └── specs/                # Per-tool specification files
-├── tools/                    # Tool implementations (coming soon)
+│   ├── publish-pipeline-cli.md   # CLI usage guide
+│   ├── architecture.md
+│   └── specs/                    # Per-tool specification files
+├── tools/
+│   ├── publish_pipeline/         # End-to-end publish CLI
 │   ├── validate_post/
+│   ├── validate_asset/
+│   ├── upload_asset/
+│   ├── platform_adapters/        # Twitter implemented; others stubbed
 │   ├── find_next_slot/
 │   ├── approval_state_manager/
 │   ├── schedule_post/
-│   └── content_brief_builder/
-├── tests/                    # Test suite
-├── templates/                # Prompt and brief templates
-└── sample_data/              # Example inputs and outputs for testing
+│   └── publish_post/
+├── tests/
+└── config/
+    └── asset_policy.json
 ```
-
----
-
-## Status
-
-This project is in the scaffolding phase. Tool specs are complete; implementations are next.
