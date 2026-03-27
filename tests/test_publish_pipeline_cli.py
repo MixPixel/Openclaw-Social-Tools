@@ -48,13 +48,14 @@ _FAILURE_RESULT = {
 
 
 def _run_main(stdin_text: str, mock_result=None):
-    """Run _main() with patched stdin/stdout; return (exit_code, parsed_output)."""
+    """Run _main() with patched stdin/stdout/argv; return (exit_code, parsed_output)."""
     target = "tools.publish_pipeline.__main__.publish_to_platform"
     captured = io.StringIO()
 
     ctx = patch(target, return_value=mock_result) if mock_result is not None else patch(target)
 
     with ctx as mock_fn, \
+         patch("sys.argv", ["python -m tools.publish_pipeline"]), \
          patch("sys.stdin", io.StringIO(stdin_text)), \
          patch("sys.stdout", captured):
         try:
@@ -298,6 +299,153 @@ class TestSubprocess(unittest.TestCase):
         for field in ("success", "platform", "post_id", "character_count",
                       "validation_errors", "media_results", "errors", "warnings"):
             self.assertIn(field, output)
+
+
+# ---------------------------------------------------------------------------
+# TestPlatformFlag
+# ---------------------------------------------------------------------------
+
+class TestPlatformFlag(unittest.TestCase):
+    """--platform flag injects or overrides the platform in the post dict."""
+
+    def _run_with_argv(self, stdin_text: str, argv: list[str], mock_result=None):
+        """Run _main() with patched sys.argv and stdin; return (exit_code, output, mock_fn)."""
+        target = "tools.publish_pipeline.__main__.publish_to_platform"
+        captured = io.StringIO()
+        full_argv = ["python -m tools.publish_pipeline"] + argv
+
+        ctx = patch(target, return_value=mock_result) if mock_result is not None else patch(target)
+
+        with ctx as mock_fn, \
+             patch("sys.argv", full_argv), \
+             patch("sys.stdin", io.StringIO(stdin_text)), \
+             patch("sys.stdout", captured):
+            try:
+                _main()
+                exit_code = 0
+            except SystemExit as exc:
+                exit_code = exc.code
+
+        captured.seek(0)
+        try:
+            output = json.loads(captured.read())
+        except json.JSONDecodeError:
+            output = None
+        return exit_code, output, mock_fn
+
+    def test_platform_flag_sets_platform_in_post(self):
+        post = {"content": "Hello!"}
+        _, _, mock_fn = self._run_with_argv(
+            json.dumps(post), ["--platform", "twitter"], mock_result=_SUCCESS_RESULT,
+        )
+        called_post = mock_fn.call_args[0][0]
+        self.assertEqual(called_post["platform"], "twitter")
+
+    def test_platform_flag_overrides_json_platform(self):
+        post = {"platform": "twitter", "content": "Hello!"}
+        _, _, mock_fn = self._run_with_argv(
+            json.dumps(post), ["--platform", "linkedin"], mock_result=_SUCCESS_RESULT,
+        )
+        called_post = mock_fn.call_args[0][0]
+        self.assertEqual(called_post["platform"], "linkedin")
+
+    def test_no_flag_preserves_json_platform(self):
+        post = {"platform": "twitter", "content": "Hello!"}
+        _, _, mock_fn = self._run_with_argv(
+            json.dumps(post), [], mock_result=_SUCCESS_RESULT,
+        )
+        called_post = mock_fn.call_args[0][0]
+        self.assertEqual(called_post["platform"], "twitter")
+
+    def test_no_flag_no_json_platform_pipeline_still_called(self):
+        """No flag and no platform in JSON — pipeline is called; it returns a validation error."""
+        post = {"content": "Hello!"}
+        _, _, mock_fn = self._run_with_argv(
+            json.dumps(post), [], mock_result=_FAILURE_RESULT,
+        )
+        mock_fn.assert_called_once()
+
+    def test_platform_flag_exit_0_on_success(self):
+        post = {"content": "Hello!"}
+        exit_code, _, _ = self._run_with_argv(
+            json.dumps(post), ["--platform", "twitter"], mock_result=_SUCCESS_RESULT,
+        )
+        self.assertEqual(exit_code, 0)
+
+    def test_platform_flag_exit_1_on_failure(self):
+        post = {"content": "Hello!"}
+        exit_code, _, _ = self._run_with_argv(
+            json.dumps(post), ["--platform", "twitter"], mock_result=_FAILURE_RESULT,
+        )
+        self.assertEqual(exit_code, 1)
+
+    def test_platform_flag_result_on_stdout(self):
+        post = {"content": "Hello!"}
+        _, output, _ = self._run_with_argv(
+            json.dumps(post), ["--platform", "twitter"], mock_result=_SUCCESS_RESULT,
+        )
+        self.assertIsNotNone(output)
+        self.assertTrue(output["success"])
+
+    def test_help_flag_exits_0(self):
+        proc = subprocess.run(
+            [sys.executable, "-m", "tools.publish_pipeline", "--help"],
+            capture_output=True,
+            cwd="/home/user/Openclaw-Social-Tools",
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn(b"--platform", proc.stdout)
+
+    def test_subprocess_platform_flag_unsupported_platform(self):
+        """--platform myspace → UNSUPPORTED_PLATFORM validation error."""
+        post = {"content": "Hello!"}
+        proc = subprocess.run(
+            [sys.executable, "-m", "tools.publish_pipeline", "--platform", "myspace"],
+            input=json.dumps(post).encode(),
+            capture_output=True,
+            cwd="/home/user/Openclaw-Social-Tools",
+        )
+        self.assertEqual(proc.returncode, 1)
+        output = json.loads(proc.stdout.decode())
+        codes = [e["code"] for e in output.get("validation_errors", [])]
+        self.assertIn("UNSUPPORTED_PLATFORM", codes)
+
+    def test_subprocess_platform_flag_no_json_platform(self):
+        """--platform twitter, no platform in JSON → reaches adapter (AUTH_ERROR)."""
+        import os
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TWITTER_")}
+        post = {"content": "Hello from OpenClaw!"}
+        proc = subprocess.run(
+            [sys.executable, "-m", "tools.publish_pipeline", "--platform", "twitter"],
+            input=json.dumps(post).encode(),
+            capture_output=True,
+            env=env,
+            cwd="/home/user/Openclaw-Social-Tools",
+        )
+        self.assertEqual(proc.returncode, 1)
+        output = json.loads(proc.stdout.decode())
+        # Reached the adapter with correct platform — AUTH_ERROR, not UNSUPPORTED_PLATFORM
+        self.assertEqual(output["platform"], "twitter")
+        self.assertEqual(output["validation_errors"], [])
+        codes = [e["code"] for e in output.get("errors", [])]
+        self.assertIn("AUTH_ERROR", codes)
+
+    def test_subprocess_platform_flag_overrides_json_platform(self):
+        """--platform twitter overrides platform: myspace in JSON body."""
+        import os
+        env = {k: v for k, v in os.environ.items() if not k.startswith("TWITTER_")}
+        post = {"platform": "myspace", "content": "Hello!"}
+        proc = subprocess.run(
+            [sys.executable, "-m", "tools.publish_pipeline", "--platform", "twitter"],
+            input=json.dumps(post).encode(),
+            capture_output=True,
+            env=env,
+            cwd="/home/user/Openclaw-Social-Tools",
+        )
+        output = json.loads(proc.stdout.decode())
+        # --platform twitter wins; reaches Twitter adapter, not an UNSUPPORTED_PLATFORM error
+        self.assertEqual(output["platform"], "twitter")
+        self.assertEqual(output["validation_errors"], [])
 
 
 if __name__ == "__main__":
