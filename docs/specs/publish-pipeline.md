@@ -135,15 +135,15 @@ Each `media_results` entry:
 
 ## Relationship to Other Layers
 
-- **`validate_post` (Step 2):** Content and media metadata validation.  Called
-  first; result propagated verbatim to `validation_errors` and `warnings`.
-- **`upload_asset` (Step 6):** Per-media binary upload.  Called for each media
-  item after content validation passes.
-- **`registry.get_adapter` (Step 4):** Resolves the platform-specific adapter
-  callable.  Called only after all uploads succeed.
-- **`publish_post` (Step 3):** Queue-based post delivery — a separate path that
-  is not called by `publish_pipeline`.  `publish_pipeline` calls the adapter
-  directly, without a scheduling queue.
+- **`validate_post`:** Content and media metadata validation. Called first;
+  result propagated verbatim to `validation_errors` and `warnings`.
+- **`upload_asset`:** Per-media binary upload. Called for each media item after
+  content validation passes.
+- **`registry.get_adapter`:** Resolves the platform-specific adapter callable.
+  Called only after all uploads succeed.
+- **`publish_post`:** Queue-based post delivery — a separate path that is not
+  called by `publish_pipeline`. `publish_pipeline` calls the adapter directly,
+  without a scheduling queue.
 
 ---
 
@@ -152,4 +152,4 @@ Each `media_results` entry:
 - Scheduling / queued delivery — use `publish_post` for that.
 - Retry logic — callers inspect `retryable` flags if available.
 - Multi-platform fan-out — call `publish_to_platform` once per target platform.
-- Draft or preview modes — out of scope for Step 9.
+- Draft or preview modes.

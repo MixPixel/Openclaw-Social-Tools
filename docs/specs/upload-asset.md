@@ -181,17 +181,17 @@ def upload_asset(asset: dict, credentials: dict) -> dict:
     """
 ```
 
-No platform adapter currently implements this function. Any call to a live
-adapter will receive `UPLOAD_NOT_IMPLEMENTED` until the platform modules are
-completed.
+The Twitter adapter fully implements this function. All other platform adapters
+(LinkedIn, Instagram, Facebook, Mastodon) raise `NotImplementedError`, which
+the orchestrator records as `UPLOAD_NOT_IMPLEMENTED`.
 
 ---
 
 ## Relationship to Other Layers
 
-- **Step 5 (validate_asset):** Consumed as a mandatory pre-flight guard.
+- **`validate_asset`:** Consumed as a mandatory pre-flight guard.
   `upload_asset` never duplicates any validation logic.
-- **Step 4 (capability_registry):** Consumed for module resolution only;
+- **`capability_registry`:** Consumed for module resolution only;
   capability checking is delegated to `validate_asset`.
-- **Future `publish_post` integration:** `upload_asset` will be called by the
-  post-publishing flow when media attachments are present.
+- **`publish_pipeline`:** `publish_to_platform` calls `upload_asset` for each
+  media attachment in the post before dispatching to the delivery adapter.

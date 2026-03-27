@@ -209,19 +209,23 @@ they can be unit-tested independently. `PlatformAdapter.__call__` orchestrates t
 
 ### Current implementation status
 
-Real HTTP delivery is not yet implemented. `_build_payload` and `_parse_response`
-raise `NotImplementedError`. When called, `PlatformAdapter.__call__` performs the
-credential check (returning `AUTH_ERROR` cleanly if credentials are missing) then
-raises `NotImplementedError` — which `publish_post` catches and records as
-`ADAPTER_EXCEPTION`.
+| Platform | Status | Auth | Post endpoint | Notes |
+|---|---|---|---|---|
+| Twitter / X | **Fully implemented** | OAuth 1.0a (HMAC-SHA1) | `POST /2/tweets` | Text posts and simple image upload (base64). Chunked video upload not yet supported. |
+| LinkedIn | Stub | OAuth 2.0 Bearer | `POST /v2/ugcPosts` | `__call__` raises `NotImplementedError`; recorded as `ADAPTER_EXCEPTION` by `publish_post`. |
+| Instagram | Stub | Graph API Bearer | Two-step: create container, then publish | Text-only posts not supported; media required. |
+| Facebook | Stub | Page Access Token | `POST /{page-id}/feed` | Photo/video use separate endpoints. |
+| Mastodon | Stub | Bearer + instance URL | `POST /api/v1/statuses` | Simplest API; instance URL varies per deployment. |
 
-| Platform | Auth | Post endpoint | Media notes |
-|---|---|---|---|
-| Twitter / X | OAuth 1.0a (HMAC-SHA1) | `POST /2/tweets` | Separate upload endpoint; media_id attached to tweet |
-| LinkedIn | OAuth 2.0 Bearer | `POST /v2/ugcPosts` | Multi-step upload: register → binary upload → attach URN |
-| Instagram | Graph API Bearer | Two-step: create container, then publish | Text-only posts not supported; media required |
-| Facebook | Page Access Token | `POST /{page-id}/feed` | Photo/video use separate endpoints |
-| Mastodon | Bearer + instance URL | `POST /api/v1/statuses` | Simplest API; instance URL varies per deployment |
+Stub adapters pass the credential check (returning `AUTH_ERROR` cleanly when
+credentials are missing) but raise `NotImplementedError` in `_build_payload` and
+`_parse_response`, which `publish_post` catches and records as `ADAPTER_EXCEPTION`.
+
+**Twitter `_parse_response` note:** Twitter's 403 responses carry two distinct
+meanings. A body containing `"duplicate content"` is mapped to `CONTENT_REJECTED`;
+all other 403s are mapped to `PERMISSION_ERROR`. The generic
+`classify_http_error` in `base.py` maps all 403s to `AUTH_ERROR` — the Twitter
+adapter overrides this case.
 
 ---
 
@@ -233,11 +237,11 @@ tools/platform_adapters/
     base.py         error codes, retryability, HTTP classification, result validation
     stub.py         StubAdapter
     registry.py     get_adapter(), get_dispatch_adapter()
-    twitter.py      Twitter / X skeleton
-    linkedin.py     LinkedIn skeleton
-    instagram.py    Instagram skeleton
-    facebook.py     Facebook skeleton
-    mastodon.py     Mastodon skeleton
+    twitter.py      Twitter / X (fully implemented — OAuth 1.0a, POST /2/tweets, media upload)
+    linkedin.py     LinkedIn (stub)
+    instagram.py    Instagram (stub)
+    facebook.py     Facebook (stub)
+    mastodon.py     Mastodon (stub)
 ```
 
 ---

@@ -48,7 +48,7 @@ The tool layer never makes judgement calls. Each tool has defined inputs, output
 ## Workflow Sequence
 
 ```
-Step 1  ──  content-brief-builder
+Step 1  ──  content-brief-builder          [NOT YET IMPLEMENTED]
             Accepts raw intent (topic, audience, platform, constraints).
             Returns a structured brief object.
 
@@ -74,8 +74,18 @@ Step 6  ──  schedule-post
             Writes the approved post + slot to the queue.
             Returns a queue ID and confirmation.
 
-Step 7  ──  (Platform delivery — outside this toolset)
+Step 7  ──  publish_pipeline (CLI: python -m tools.publish_pipeline)
+            Validates content, uploads media attachments, dispatches to the
+            platform adapter, and returns a structured JSON result.
+
+            Currently: Twitter text posts work end-to-end.
+            Other platforms: stub adapters return ADAPTER_EXCEPTION.
 ```
+
+Note: Steps 1–6 and Step 7 are not yet wired together automatically. Step 7
+(`publish_pipeline`) can be called directly today with a JSON post payload.
+`publish_post` (the queue-based delivery path) is implemented but not yet
+connected to the live platform adapters.
 
 ---
 
@@ -104,6 +114,15 @@ content-brief-builder  →  { brief }
 { post_id, actor }     →  approval-state-manager  →  { new_state, log_entry }
 { schedule_config }    →  find-next-slot  →  { slot_datetime }
 { post, slot }         →  schedule-post  →  { queue_id, confirmation }
+{ post_payload }       →  publish_pipeline  →  { success, post_id, errors? }
+```
+
+Inside `publish_pipeline`, media attachments flow through a sub-pipeline:
+
+```
+{ asset }  →  validate_asset  →  { valid? }
+{ asset }  →  upload_asset    →  { asset_ref }
+{ entry + asset_refs }  →  platform_adapter  →  { platform_post_id }
 ```
 
 All tool inputs and outputs are JSON-serialisable. No tool depends on another tool's internal state — they communicate only through data.

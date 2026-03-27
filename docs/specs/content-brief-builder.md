@@ -71,6 +71,15 @@ Note: `platform_rules` is injected automatically based on the `platform` field â
 
 ---
 
+## Implementation Status
+
+**Not yet implemented.** The `tools/content_brief_builder/` directory exists but
+contains no code. This spec describes the intended contract. All other tools in
+the workflow (`validate-post` through `publish_pipeline`) are implemented and
+working.
+
+---
+
 ## Where It Fits in the Workflow
 
 **Position: Step 1 â€” first tool called.**
